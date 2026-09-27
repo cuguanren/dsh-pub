@@ -106494,6 +106494,27 @@
       "readmePath": "README.md",
       "licensePath": "LICENSE",
       "automation": { "analyzedAt": "2026-09-27", "method": "automated-static-contract" }
+    },
+    {
+      "repository": "https://github.com/agentsoftwaresuite/dsh-agent-harness",
+      "commit": "a35ca678e4d1679c4b6b2db488e6d833df90d0d8",
+      "directory": "",
+      "packageName": "dsh-agent-harness",
+      "manifestPath": "package.json",
+      "bundlePatchPath": "cordis.patch.yml",
+      "runtimeEntryPath": "src/index.mjs",
+      "readmePath": "README.md",
+      "licensePath": "LICENSE",
+      "submission": {
+        "file": "https://github.com/dsh-pub/dsh-pub/blob/main/submissions/agentsoftwaresuite--dsh-agent-harness.json",
+        "pullRequest": "https://github.com/dsh-pub/dsh-pub/pull/42",
+        "submittedAt": "2026-08-23",
+        "category": "bundles",
+        "description": {
+          "en": "Free MIT-licensed DSH plugin for task-aware Agent Harness routing and local model optimization",
+          "zh": ""
+        }
+      }
     }
   ]
 }

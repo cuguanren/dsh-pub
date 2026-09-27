@@ -7,9 +7,9 @@
       "generatedAt": "2026-08-13T19:38:46+08:00"
     },
     "community": {
-      "repository": "https://github.com/topics/dsh-plugin",
-      "generatedAt": "2026-09-26T19:32:26.404Z",
-      "policy": "automated-pinned-source-contracts"
+      "repository": "https://github.com/dsh-pub/dsh-pub",
+      "generatedAt": "2026-09-27T09:50:36.000Z",
+      "policy": "pinned-source-contracts"
     }
   },
   "topics": [
@@ -177485,6 +177485,26 @@
       "repository": "https://github.com/zzzmmmnn/dsh-openkapsel",
       "directory": "",
       "commit": "c7ccdff3330d4e0a6b062541f6f328eb512da890"
+    },
+    {
+      "slug": "dsh-agent-harness",
+      "name": "dsh-agent-harness",
+      "description": {
+        "en": "Free MIT-licensed DSH plugin for task-aware Agent Harness routing and local model optimization",
+        "zh": "Free MIT-licensed DSH plugin for task-aware Agent Harness routing and local model optimization"
+      },
+      "topic": "other",
+      "category": "bundles",
+      "type": "bundle",
+      "provenance": "community",
+      "surfaces": [
+        "profile"
+      ],
+      "installable": true,
+      "capabilityCount": 0,
+      "repository": "https://github.com/agentsoftwaresuite/dsh-agent-harness",
+      "directory": "",
+      "commit": "a35ca678e4d1679c4b6b2db488e6d833df90d0d8"
     }
   ]
 }
