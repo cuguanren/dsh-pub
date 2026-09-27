@@ -134,7 +134,12 @@ const structuredData = [
 ];
 ---
 
-<BaseLayout locale={locale} showHeaderSearch={false} structuredData={structuredData}>
+<BaseLayout
+  locale={locale}
+  showHeaderSearch={false}
+  structuredData={structuredData}
+  loadAdSense={Boolean(homeAdSlot)}
+>
   <section class="registry-hero">
     <HarnessBackdrop />
 
