@@ -23,6 +23,11 @@ const ecosystemCatalog = JSON.parse(
 const marketplaceCount =
   sourceCatalog.entries.filter((entry) => entry.type === 'plugin' || entry.type === 'bundle')
     .length + communityCatalog.entries.length;
+const automatedSlugs = new Set(
+  communityCatalog.entries
+    .filter((entry) => entry.provenance?.status === 'community-automated')
+    .map((entry) => entry.slug),
+);
 const host = '127.0.0.1';
 let origin = `http://${host}`;
 
@@ -158,10 +163,17 @@ async function assertSeoSurface() {
   const localizedHtml = (await readdir(distRoot, { recursive: true })).filter((path) =>
     /^(en|zh)\/.*index\.html$/.test(path),
   );
-  if (urls.length !== localizedHtml.length || urls.includes('https://dsh.pub/')) {
+  const indexableHtml = localizedHtml.filter((path) => {
+    const match = path.match(/^(?:en|zh)\/plugins\/([^/]+)\/index\.html$/);
+    return !(match && automatedSlugs.has(match[1]));
+  });
+  if (urls.length !== indexableHtml.length || urls.includes('https://dsh.pub/')) {
     throw new Error(
-      `Expected ${localizedHtml.length} indexable URLs without the locale redirect, received ${urls.length}.`,
+      `Expected ${indexableHtml.length} indexable URLs without the locale redirect or automated plugin pages, received ${urls.length}.`,
     );
+  }
+  if (sitemap.includes('/plugins/open-sea-skin/')) {
+    throw new Error('The sitemap still lists a noindex automated plugin page.');
   }
   if (!sitemap.includes('hreflang="en"') || !sitemap.includes('hreflang="zh-CN"')) {
     throw new Error('The sitemap does not pair English and Chinese variants.');
@@ -403,10 +415,18 @@ try {
   await assertPage('/zh/plugins/web-app/', '激活层，不代表该 Git 子目录可以独立安装');
   await assertPageOmits('/zh/plugins/web-app/', 'npx dshpub add');
   await assertPageOmits('/zh/plugins/web-app/', 'CLI 安装量');
-  await assertPage('/zh/plugins/web-app/', 'data-ad-slot="1234567890"');
-  await assertPage('/en/plugins/', 'data-ad-slot="0987654321"');
+  await assertPage('/zh/', 'data-ad-slot="1234567890"');
+  await assertPageOmits('/zh/plugins/web-app/', 'data-ad-slot=');
+  await assertPageOmits('/zh/plugins/web-app/', 'pagead2.googlesyndication.com');
+  await assertPageOmits('/zh/plugins/web-app/', 'name="google-adsense-account"');
+  await assertPageOmits('/zh/plugins/dsh-genui/', 'pagead2.googlesyndication.com');
+  await assertPageOmits('/zh/plugins/open-sea-skin/', 'pagead2.googlesyndication.com');
+  await assertPageOmits('/en/plugins/', 'data-ad-slot=');
+  await assertPageOmits('/en/plugins/', 'pagead2.googlesyndication.com');
+  await assertPageOmits('/en/guide/', 'pagead2.googlesyndication.com');
   await assertPageOmits('/en/submit/', 'data-ad-slot=');
   await assertPageOmits('/zh/submit/', 'class="adsbygoogle"');
+  await assertPageOmits('/zh/submit/', 'pagead2.googlesyndication.com');
   await assertPage('/zh/plugins/dsh-genui/', 'omdsh-dev / dsh-genui');
   await assertPage('/zh/plugins/dsh-genui/', 'href="/zh/categories/ui-client/"');
   await assertPage(
@@ -422,6 +442,11 @@ try {
   );
   await assertPageOmits('/zh/plugins/dsh-automation/', '--path');
   await assertPage('/zh/plugins/dsh-automation/', 'rel="ugc"');
+  await assertPageOmits('/zh/plugins/dsh-automation/', '<meta name="robots" content="noindex">');
+  await assertPage('/zh/plugins/open-sea-skin/', '<meta name="robots" content="noindex">');
+  await assertPage('/zh/plugins/open-sea-skin/', '目录摘要');
+  await assertPageOmits('/zh/plugins/open-sea-skin/', 'readme-content');
+  await assertPageOmits('/zh/plugins/web-app/', '<meta name="robots" content="noindex">');
   await assertPage('/en/submit/', 'Submit a DSH plugin');
   await assertPage('/zh/submit/', '提交一个 DSH 插件');
   await assertPage('/en/submit/', 'This is taking longer than expected. Please try again.');

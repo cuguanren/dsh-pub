@@ -125,6 +125,10 @@ export const copy = {
     runtime: 'Runtime anatomy',
     contributions: 'What it contributes',
     readme: 'Package documentation',
+    readmeSummaryTitle: 'Registry summary',
+    readmeSummaryBody:
+      'dsh.pub verifies the pinned bundle contract, runtime facts, and distribution semantics. The complete README remains in the source repository.',
+    readmeSummaryLink: 'Read the full README on GitHub',
     limitations: 'Known limitations',
     openGitHub: 'Open on GitHub',
     viewPackage: 'View package',
@@ -259,6 +263,10 @@ export const copy = {
     runtime: '运行时构成',
     contributions: '它贡献了什么',
     readme: '插件文档',
+    readmeSummaryTitle: '目录摘要',
+    readmeSummaryBody:
+      'dsh.pub 核对固定版本的组合包契约、运行时事实与分发语义；完整 README 请查看源仓库。',
+    readmeSummaryLink: '在 GitHub 阅读完整 README',
     limitations: '已知限制',
     openGitHub: '在 GitHub 打开',
     viewPackage: '查看插件',

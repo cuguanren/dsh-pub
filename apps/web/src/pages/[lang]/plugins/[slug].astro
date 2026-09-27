@@ -3,7 +3,6 @@ import { marked } from 'marked';
 import sanitizeHtml from 'sanitize-html';
 
 import CopyCommand from '../../../components/CopyCommand.astro';
-import AdSlot from '../../../components/AdSlot.astro';
 import Icon from '../../../components/Icon.astro';
 import {
   displayName,
@@ -19,7 +18,6 @@ import {
 import { marketplaceEntries } from '../../../lib/catalog.js';
 import { categoryLabel, typeLabel } from '../../../lib/categories.js';
 import { buildCapabilityTableRows } from '../../../lib/contribution-display.js';
-import { normalizeAdSenseSlotId } from '../../../lib/adsense.js';
 import { copy, locales, type Locale } from '../../../lib/i18n.js';
 import { loadReadmeHtml, readmeContentUrl } from '../../../lib/readme.js';
 import { relatedGuideHash, relatedPlugins } from '../../../lib/related-plugins.js';
@@ -42,7 +40,6 @@ interface Props {
 
 const { entry, locale } = Astro.props;
 const t = copy[locale];
-const detailSlot = normalizeAdSenseSlotId(import.meta.env.PUBLIC_ADSENSE_SLOT_DETAIL);
 const description = localized(entry.description, locale);
 const rawDescription = await marked.parseInline(description, { gfm: true });
 const descriptionHtml = sanitizeHtml(rawDescription, {
@@ -67,6 +64,7 @@ const provenanceLabel =
         ? t.communityAutomated
         : t.builtInSource;
 const sourceRel = provenance === 'built-in' ? undefined : 'ugc';
+const noIndex = provenance === 'community-automated';
 const topic = topicForEntry(entry);
 const command = installCommand(entry);
 const distributionNote = localized(entry.distribution.note, locale);
@@ -77,7 +75,7 @@ const provenanceStatement =
     ? localized(entry.provenance.statement, locale)
     : t.builtInSourceHelp;
 const readmeSource = readmeContentUrl(entry, locale);
-const readme = await loadReadmeHtml(entry, locale);
+const readme = noIndex ? '' : await loadReadmeHtml(entry, locale);
 const limitationRaw = localized(entry.docs?.limitations, locale);
 const limitation =
   limitationRaw &&
@@ -149,6 +147,7 @@ const structuredData = [
   title={pageTitle}
   description={metaDescription}
   structuredData={structuredData}
+  noIndex={noIndex}
 >
   <section class="package-masthead">
     <div class="page-shell masthead-inner">
@@ -290,12 +289,9 @@ const structuredData = [
             <div class="readme-content" set:html={readme} />
           ) : (
             <div class="readme-fallback">
+              <h3>{t.readmeSummaryTitle}</h3>
               <div set:html={descriptionHtml} />
-              <p>
-                {locale === 'zh'
-                  ? '完整双语 README 位于源仓库。本目录页优先展示可自动验证的运行时与分发事实。'
-                  : 'The complete bilingual README lives in the source repository. This registry page prioritizes runtime and distribution facts that can be verified automatically.'}
-              </p>
+              <p>{t.readmeSummaryBody}</p>
               <a
                 class="text-link"
                 href={
@@ -306,7 +302,7 @@ const structuredData = [
                 }
                 rel={sourceRel}
               >
-                {t.openGitHub}
+                {t.readmeSummaryLink}
                 <Icon name="external" size={15} />
               </a>
             </div>
@@ -391,8 +387,6 @@ const structuredData = [
           </section>
         )
       }
-
-      {detailSlot && <AdSlot locale={locale} unit={detailSlot} class="detail-ad" />}
     </aside>
   </div>
 
@@ -960,6 +954,12 @@ const structuredData = [
   .readme-fallback {
     color: var(--color-text-muted);
     line-height: 1.75;
+  }
+
+  .readme-fallback h3 {
+    color: var(--color-text);
+    font-size: 1.05rem;
+    margin: 0 0 0.75rem;
   }
 
   .readme-content {

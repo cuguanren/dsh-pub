@@ -55,6 +55,12 @@ describe('Topic catalog sync workflow contract', () => {
     const build = job.steps.find(
       (step: { name?: string }) => step.name === 'Build deployable workspace',
     );
+    expect(build.env).toEqual({
+      PUBLIC_ADSENSE_CLIENT_ID: 'ca-pub-7584943302476161',
+      PUBLIC_ADSENSE_SLOT_CATALOG: '0987654321',
+      PUBLIC_ADSENSE_SLOT_DETAIL: '1234567890',
+      PUBLIC_GA_MEASUREMENT_ID: 'G-TEST123456',
+    });
     const e2e = job.steps.find((step: { name?: string }) => step.name === 'Run integration tests');
     const token = job.steps.find(
       (step: { name?: string }) => step.name === 'Create catalog push token',

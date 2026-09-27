@@ -1,4 +1,5 @@
 ---
+import AdSlot from '../../components/AdSlot.astro';
 import HarnessBackdrop from '../../components/HarnessBackdrop.astro';
 import Icon from '../../components/Icon.astro';
 import PluginTile from '../../components/PluginTile.astro';
@@ -11,6 +12,7 @@ import {
   initialTileCount,
   starsFor,
 } from '../../lib/browse.js';
+import { normalizeAdSenseSlotId } from '../../lib/adsense.js';
 import { copy, isLocale, locales } from '../../lib/i18n.js';
 import { useCaseLabel } from '../../lib/use-cases.js';
 import BaseLayout from '../../layouts/BaseLayout.astro';
@@ -26,6 +28,7 @@ const t = copy[locale];
 const highlights = communityHighlights.slice(0, 6);
 const initialTiles = browsableEntries.slice(0, initialTileCount);
 const installable = browseTotals.installable.toLocaleString();
+const homeAdSlot = normalizeAdSenseSlotId(import.meta.env.PUBLIC_ADSENSE_SLOT_DETAIL);
 
 const ui =
   locale === 'zh'
@@ -131,7 +134,12 @@ const structuredData = [
 ];
 ---
 
-<BaseLayout locale={locale} showHeaderSearch={false} structuredData={structuredData}>
+<BaseLayout
+  locale={locale}
+  showHeaderSearch={false}
+  structuredData={structuredData}
+  loadAdSense={Boolean(homeAdSlot)}
+>
   <section class="registry-hero">
     <HarnessBackdrop />
 
@@ -273,6 +281,14 @@ const structuredData = [
       </div>
     </div>
   </section>
+
+  {
+    homeAdSlot && (
+      <div class="page-shell home-ad">
+        <AdSlot locale={locale} unit={homeAdSlot} class="home-ad-slot" />
+      </div>
+    )
+  }
 </BaseLayout>
 
 <script>
@@ -371,6 +387,17 @@ const structuredData = [
 </script>
 
 <style>
+  .home-ad {
+    margin-block: 1.5rem 2.5rem;
+  }
+
+  .home-ad :global(.home-ad-slot) {
+    background: var(--color-surface);
+    border: 1px solid var(--color-rule);
+    border-radius: 10px;
+    padding: 1rem;
+  }
+
   .registry-hero {
     background: var(--color-navy-900);
     color: var(--color-text-on-dark);
