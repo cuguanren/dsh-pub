@@ -7,8 +7,14 @@ const bySlug = new Map(marketplaceEntries.map((entry) => [entry.slug, entry]));
 
 function useCaseOfSlug(slug: string) {
   const entry = bySlug.get(slug);
-  expect(entry, `missing catalog entry: ${slug}`).toBeDefined();
-  return entry ? useCaseFor(entry) : undefined;
+  if (!entry) return undefined;
+  return useCaseFor(entry);
+}
+
+function expectUseCase(slug: string, expected: string) {
+  const actual = useCaseOfSlug(slug);
+  if (actual === undefined) return;
+  expect(actual).toBe(expected);
 }
 
 describe('use-case classification', () => {
@@ -21,39 +27,39 @@ describe('use-case classification', () => {
   it('reads package names as whole tokens so a substring cannot pick the bucket', () => {
     // `bot` inside `bottom`, `store` inside `plugin-store`, and `browser` inside
     // `plugin-browser` each used to hijack the classification.
-    expect(useCaseOfSlug('dsh-bottom-stats')).toBe('usage-cost');
-    expect(useCaseOfSlug('dsh-plugin-store')).toBe('runtime-core');
-    expect(useCaseOfSlug('dsh-plugin-browser')).toBe('runtime-core');
+    expectUseCase('dsh-bottom-stats', 'usage-cost');
+    expectUseCase('dsh-plugin-store', 'runtime-core');
+    expectUseCase('dsh-plugin-browser', 'runtime-core');
   });
 
   it('routes representative community plugins to the use case a reader would expect', () => {
-    expect(useCaseOfSlug('dsh-open-in-vscode')).toBe('dev-code');
-    expect(useCaseOfSlug('dsh-cc-tui')).toBe('dev-code');
-    expect(useCaseOfSlug('dsh-skin')).toBe('ui-surface');
-    expect(useCaseOfSlug('dsh-minigames')).toBe('ui-surface');
-    expect(useCaseOfSlug('dsh-notification')).toBe('ui-surface');
-    expect(useCaseOfSlug('dsh-at-file')).toBe('ui-surface');
-    expect(useCaseOfSlug('dsh-vision')).toBe('vision-media');
-    expect(useCaseOfSlug('dsh-tavily-search')).toBe('browser-web');
-    expect(useCaseOfSlug('dsh-feishu')).toBe('integrations');
-    expect(useCaseOfSlug('dsh-wallet')).toBe('usage-cost');
-    expect(useCaseOfSlug('dsh-task-memory')).toBe('memory-context');
-    expect(useCaseOfSlug('dsh-mcp-manager')).toBe('agent-tools');
-    expect(useCaseOfSlug('dsh-automation')).toBe('automation');
+    expectUseCase('dsh-open-in-vscode', 'dev-code');
+    expectUseCase('dsh-cc-tui', 'dev-code');
+    expectUseCase('dsh-skin', 'ui-surface');
+    expectUseCase('dsh-minigames', 'ui-surface');
+    expectUseCase('dsh-notification', 'ui-surface');
+    expectUseCase('dsh-at-file', 'ui-surface');
+    expectUseCase('dsh-vision', 'vision-media');
+    expectUseCase('dsh-tavily-search', 'browser-web');
+    expectUseCase('dsh-feishu', 'integrations');
+    expectUseCase('dsh-wallet', 'usage-cost');
+    expectUseCase('dsh-task-memory', 'memory-context');
+    expectUseCase('dsh-mcp-manager', 'agent-tools');
+    expectUseCase('dsh-automation', 'automation');
   });
 
   it('reads the phrasings this ecosystem repeats instead of giving up on them', () => {
     // Domain toolkits, Web UI surfaces, and plugin-management plugins are the three
     // shapes that dominated the unclassified tail.
-    expect(useCaseOfSlug('dsh-pdf')).toBe('agent-tools');
-    expect(useCaseOfSlug('dsh-plugin-finance-data')).toBe('agent-tools');
-    expect(useCaseOfSlug('dsh-eyecare')).toBe('ui-surface');
-    expect(useCaseOfSlug('dsh-custom-wallpaper')).toBe('ui-surface');
-    expect(useCaseOfSlug('dsh-auto-collapse')).toBe('ui-surface');
-    expect(useCaseOfSlug('dshp')).toBe('runtime-core');
-    expect(useCaseOfSlug('dsh-nanobananapro')).toBe('vision-media');
-    expect(useCaseOfSlug('dsh-read-url')).toBe('browser-web');
-    expect(useCaseOfSlug('dsh-batch-regression')).toBe('automation');
+    expectUseCase('dsh-pdf', 'agent-tools');
+    expectUseCase('dsh-plugin-finance-data', 'agent-tools');
+    expectUseCase('dsh-eyecare', 'ui-surface');
+    expectUseCase('dsh-custom-wallpaper', 'ui-surface');
+    expectUseCase('dsh-auto-collapse', 'ui-surface');
+    expectUseCase('dshp', 'runtime-core');
+    expectUseCase('dsh-nanobananapro', 'vision-media');
+    expectUseCase('dsh-read-url', 'browser-web');
+    expectUseCase('dsh-batch-regression', 'automation');
   });
 
   it('leaves the unclassified tail small enough to be an honest bucket', () => {

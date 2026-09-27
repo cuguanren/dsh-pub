@@ -23,19 +23,47 @@ const ecosystemCatalog = JSON.parse(
 const marketplaceCount =
   sourceCatalog.entries.filter((entry) => entry.type === 'plugin' || entry.type === 'bundle')
     .length + communityCatalog.entries.length;
-const reviewedCommunityCount = communityCatalog.entries.filter(
-  (entry) => entry.provenance?.status === 'community-reviewed',
-).length;
+const automatedSlugs = new Set(
+  communityCatalog.entries
+    .filter((entry) => entry.provenance?.status === 'community-automated')
+    .map((entry) => entry.slug),
+);
 const host = '127.0.0.1';
 let origin = `http://${host}`;
 
-const build = spawnSync('npm', ['run', 'build'], {
-  cwd: appRoot,
-  encoding: 'utf8',
-  env: { ...process.env, PUBLIC_GA_MEASUREMENT_ID: 'G-TEST123456' },
-  stdio: 'inherit',
-});
-if (build.status !== 0) process.exit(build.status ?? 1);
+async function distReady() {
+  try {
+    await stat(join(distRoot, 'en/index.html'));
+    await stat(join(distRoot, 'zh/plugins/web-app/index.html'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (process.env.E2E_SKIP_BUILD === '1') {
+  if (!(await distReady())) {
+    console.error(
+      'E2E_SKIP_BUILD is set, but apps/web/dist is missing required pages. Run `npm run build -w @dsh-pub/web` first.',
+    );
+    process.exit(1);
+  }
+  console.log('Skipping web build: reusing existing apps/web/dist');
+} else {
+  const build = spawnSync('npm', ['run', 'build'], {
+    cwd: appRoot,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PUBLIC_GA_MEASUREMENT_ID: 'G-TEST123456',
+      PUBLIC_ADSENSE_CLIENT_ID: 'ca-pub-7584943302476161',
+      PUBLIC_ADSENSE_SLOT_DETAIL: '1234567890',
+      PUBLIC_ADSENSE_SLOT_CATALOG: '0987654321',
+    },
+    stdio: 'inherit',
+  });
+  if (build.status !== 0) process.exit(build.status ?? 1);
+}
 
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -135,10 +163,17 @@ async function assertSeoSurface() {
   const localizedHtml = (await readdir(distRoot, { recursive: true })).filter((path) =>
     /^(en|zh)\/.*index\.html$/.test(path),
   );
-  if (urls.length !== localizedHtml.length || urls.includes('https://dsh.pub/')) {
+  const indexableHtml = localizedHtml.filter((path) => {
+    const match = path.match(/^(?:en|zh)\/plugins\/([^/]+)\/index\.html$/);
+    return !(match && automatedSlugs.has(match[1]));
+  });
+  if (urls.length !== indexableHtml.length || urls.includes('https://dsh.pub/')) {
     throw new Error(
-      `Expected ${localizedHtml.length} indexable URLs without the locale redirect, received ${urls.length}.`,
+      `Expected ${indexableHtml.length} indexable URLs without the locale redirect or automated plugin pages, received ${urls.length}.`,
     );
+  }
+  if (sitemap.includes('/plugins/open-sea-skin/')) {
+    throw new Error('The sitemap still lists a noindex automated plugin page.');
   }
   if (!sitemap.includes('hreflang="en"') || !sitemap.includes('hreflang="zh-CN"')) {
     throw new Error('The sitemap does not pair English and Chinese variants.');
@@ -183,9 +218,22 @@ async function assertSeoSurface() {
     !homepage.includes('"name":"如何安装 DSH 插件？"') ||
     !homepage.includes('id="faq-title"') ||
     !homepage.includes('DeepSeek Harness 插件常见问题</h2>') ||
-    !homepage.includes('googletagmanager.com/gtag/js?id=G-TEST123456')
+    !homepage.includes('googletagmanager.com/gtag/js?id=G-TEST123456') ||
+    !homepage.includes('name="google-adsense-account"') ||
+    !homepage.includes('content="ca-pub-7584943302476161"') ||
+    !homepage.includes(
+      'pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7584943302476161',
+    ) ||
+    !homepage.includes('页面可能展示 Google 广告')
   ) {
-    throw new Error('The localized homepage SEO or conditional Analytics tag is incomplete.');
+    throw new Error(
+      'The localized homepage SEO, Analytics, or AdSense account tags are incomplete.',
+    );
+  }
+
+  const adsTxt = await responseBody('/ads.txt');
+  if (!adsTxt.includes('google.com, pub-7584943302476161, DIRECT, f08c47fec0942fa0')) {
+    throw new Error(`ads.txt is missing the AdSense publisher line: ${JSON.stringify(adsTxt)}`);
   }
 
   const englishHomepage = await responseBody('/en/');
@@ -217,8 +265,26 @@ async function assertSeoSurface() {
     '<title>@omdsh-dev/dsh-genui — DeepSeek Harness plugin · dsh.pub</title>',
     '"@type":"SoftwareSourceCode"',
     '"@type":"BreadcrumbList"',
+    '/en/categories/ui-client/',
+    'data-related-plugins',
+    'How installable plugins work',
+    'Ranked by shared capability topic',
+    'CLI-reported installs',
   ]) {
     if (!detail.includes(expected)) throw new Error(`Plugin JSON-LD is missing ${expected}.`);
+  }
+  const relatedCount = [...detail.matchAll(/data-related-plugin="/g)].length;
+  if (relatedCount < 3 || relatedCount > 6) {
+    throw new Error(`Expected 3–6 related plugin links, found ${relatedCount}.`);
+  }
+  if (!detail.includes('data-related-plugin="dsh-at-file"')) {
+    throw new Error('Related plugins omitted the shared conversation.input.dock overlap.');
+  }
+  if (
+    /related-method[\s\S]{0,400}\b(similar|best|compatible)\b/i.test(detail) ||
+    !detail.includes('/en/guide/#installable')
+  ) {
+    throw new Error('Related plugins must disclose overlap ranking and link to the install guide.');
   }
 
   const topic = await responseBody('/en/categories/ui-client/');
@@ -337,15 +403,30 @@ try {
   await assertPage('/zh/', 'src="/brand/dshbot.png"');
   await assertPageOmits('/zh/', '目录源码');
   await assertPage('/en/plugins/', 'Browse plugins');
-  await assertPage('/en/plugins/?provenance=community-reviewed', 'Community · source reviewed');
+  await assertPage('/en/plugins/', 'Community · source reviewed');
   await assertPage('/en/plugins/', 'data-provenance="community-reviewed"');
+  await assertPage('/en/plugins/', 'data-category-filter');
   await assertStylesContain('/en/plugins/', '[hidden]{display:none}');
   await assertPage('/zh/plugins/client-ui-trajectory/', 'dsh-client-ui-trajectory');
-  await assertPage('/zh/plugins/web-app/', '内置 Profile 层');
+  await assertPage('/zh/plugins/web-app/', '随 Profile 使用，无需单独安装');
+  await assertPage('/zh/plugins/web-app/', 'BUILT-IN / PROFILE LAYER');
   await assertPage('/zh/plugins/web-app/', '<code>cordis.patch.yml</code>');
   await assertPage('/zh/plugins/web-app/', 'data-technical-overview');
-  await assertPage('/zh/plugins/web-app/', '不适用 CLI 安装量');
+  await assertPage('/zh/plugins/web-app/', '激活层，不代表该 Git 子目录可以独立安装');
   await assertPageOmits('/zh/plugins/web-app/', 'npx dshpub add');
+  await assertPageOmits('/zh/plugins/web-app/', 'CLI 安装量');
+  await assertPage('/zh/', 'data-ad-slot="1234567890"');
+  await assertPageOmits('/zh/plugins/web-app/', 'data-ad-slot=');
+  await assertPageOmits('/zh/plugins/web-app/', 'pagead2.googlesyndication.com');
+  await assertPageOmits('/zh/plugins/web-app/', 'name="google-adsense-account"');
+  await assertPageOmits('/zh/plugins/dsh-genui/', 'pagead2.googlesyndication.com');
+  await assertPageOmits('/zh/plugins/open-sea-skin/', 'pagead2.googlesyndication.com');
+  await assertPageOmits('/en/plugins/', 'data-ad-slot=');
+  await assertPageOmits('/en/plugins/', 'pagead2.googlesyndication.com');
+  await assertPageOmits('/en/guide/', 'pagead2.googlesyndication.com');
+  await assertPageOmits('/en/submit/', 'data-ad-slot=');
+  await assertPageOmits('/zh/submit/', 'class="adsbygoogle"');
+  await assertPageOmits('/zh/submit/', 'pagead2.googlesyndication.com');
   await assertPage('/zh/plugins/dsh-genui/', 'omdsh-dev / dsh-genui');
   await assertPage('/zh/plugins/dsh-genui/', 'href="/zh/categories/ui-client/"');
   await assertPage(
@@ -361,6 +442,11 @@ try {
   );
   await assertPageOmits('/zh/plugins/dsh-automation/', '--path');
   await assertPage('/zh/plugins/dsh-automation/', 'rel="ugc"');
+  await assertPageOmits('/zh/plugins/dsh-automation/', '<meta name="robots" content="noindex">');
+  await assertPage('/zh/plugins/open-sea-skin/', '<meta name="robots" content="noindex">');
+  await assertPage('/zh/plugins/open-sea-skin/', '目录摘要');
+  await assertPageOmits('/zh/plugins/open-sea-skin/', 'readme-content');
+  await assertPageOmits('/zh/plugins/web-app/', '<meta name="robots" content="noindex">');
   await assertPage('/en/submit/', 'Submit a DSH plugin');
   await assertPage('/zh/submit/', '提交一个 DSH 插件');
   await assertPage('/en/submit/', 'This is taking longer than expected. Please try again.');
@@ -416,35 +502,41 @@ try {
       );
     }
 
-    await page.goto(`${origin}/en/plugins/?provenance=community-reviewed`);
-    await page.waitForFunction(
-      (expected) =>
-        globalThis.document.querySelector('[data-result-count]')?.textContent?.trim() ===
-        String(expected),
-      reviewedCommunityCount,
-    );
+    await page.goto(`${origin}/en/plugins/`);
+    const categoryFilter = page.locator('[data-category-filter="Web UI"]');
+    await categoryFilter.waitFor();
+    const unfilteredCount = await page.locator('[data-result-count]').innerText();
+    await categoryFilter.click();
+    await page.waitForFunction((baseline) => {
+      const active = globalThis.document.querySelector('[data-category-filter].active');
+      const count = globalThis.document.querySelector('[data-result-count]')?.textContent?.trim();
+      return (
+        active?.getAttribute('data-category-filter') === 'Web UI' &&
+        globalThis.location.search.includes('category=') &&
+        Boolean(count) &&
+        count !== baseline
+      );
+    }, unfilteredCount.trim());
     const browserState = await page.evaluate(() => {
-      const rows = [...globalThis.document.querySelectorAll('[data-plugin-row]')];
-      const visibleRows = rows.filter((row) => !row.hasAttribute('hidden'));
+      const items = [...globalThis.document.querySelectorAll('[data-catalog-item]')];
       return {
-        provenance: globalThis.document.querySelector('[data-provenance-filter]')?.value,
-        count: globalThis.document.querySelector('[data-result-count]')?.textContent?.trim(),
-        visible: visibleRows.length,
-        visibleAreCommunity: visibleRows.every(
-          (row) => row.getAttribute('data-provenance') === 'community-reviewed',
+        category: globalThis.document
+          .querySelector('[data-category-filter].active')
+          ?.getAttribute('data-category-filter'),
+        count: Number(
+          globalThis.document.querySelector('[data-result-count]')?.textContent?.trim() ?? '',
         ),
-        builtInsHidden: rows
-          .filter((row) => row.getAttribute('data-provenance') === 'built-in')
-          .every((row) => row.hasAttribute('hidden')),
+        visible: items.length,
+        allMatchCategory: items.every((item) => item.getAttribute('data-category') === 'Web UI'),
+        search: globalThis.location.search,
       };
     });
     if (
-      browserState.provenance !== 'community-reviewed' ||
-      browserState.count !== String(reviewedCommunityCount) ||
-      browserState.visible !== reviewedCommunityCount ||
-      !browserState.visibleAreCommunity ||
-      !browserState.builtInsHidden ||
-      !page.url().endsWith('/en/plugins/?provenance=community-reviewed')
+      browserState.category !== 'Web UI' ||
+      browserState.count < 1 ||
+      browserState.visible < 1 ||
+      !browserState.allMatchCategory ||
+      !browserState.search.includes('category=Web')
     ) {
       throw new Error(`Browser catalog filter failed: ${JSON.stringify(browserState)}`);
     }
@@ -458,7 +550,14 @@ try {
         inlineCode: details.querySelector('code')?.textContent,
         literalBackticks: details.textContent?.includes('`cordis.patch.yml`'),
         installMetric: Boolean(globalThis.document.querySelector('[data-detail-install-count]')),
-        builtInDistribution: Boolean(globalThis.document.querySelector('.distribution-panel')),
+        builtInDistribution: Boolean(globalThis.document.querySelector('.included-panel')),
+        relatedCount: globalThis.document.querySelectorAll('[data-related-plugin]').length,
+        includedGuide: Boolean(
+          globalThis.document.querySelector('[data-related-plugins] a[href$="/guide/#included"]'),
+        ),
+        categoryHub: Boolean(
+          globalThis.document.querySelector('[data-related-plugins] a[href*="/categories/"]'),
+        ),
       };
     });
     if (
@@ -466,7 +565,10 @@ try {
       initialDetailState.inlineCode !== 'cordis.patch.yml' ||
       initialDetailState.literalBackticks ||
       initialDetailState.installMetric ||
-      !initialDetailState.builtInDistribution
+      !initialDetailState.builtInDistribution ||
+      initialDetailState.relatedCount < 3 ||
+      !initialDetailState.includedGuide ||
+      !initialDetailState.categoryHub
     ) {
       throw new Error(`Built-in detail summary failed: ${JSON.stringify(initialDetailState)}`);
     }

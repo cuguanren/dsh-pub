@@ -1,5 +1,6 @@
 name: Topic catalog sync
 
+# Manual re-run: GitHub Actions → Topic catalog sync → Run workflow.
 on:
   push:
     branches:
@@ -57,6 +58,11 @@ jobs:
 
       - name: Build deployable workspace
         run: npm run build
+        env:
+          PUBLIC_ADSENSE_CLIENT_ID: ca-pub-7584943302476161
+          PUBLIC_ADSENSE_SLOT_CATALOG: '0987654321'
+          PUBLIC_ADSENSE_SLOT_DETAIL: '1234567890'
+          PUBLIC_GA_MEASUREMENT_ID: G-TEST123456
 
       - name: Create catalog push token
         id: catalog-app-token
@@ -105,3 +111,6 @@ jobs:
 
       - name: Run integration tests
         run: npm run e2e
+        env:
+          E2E_SKIP_BUILD: '1'
+          PUBLIC_GA_MEASUREMENT_ID: G-TEST123456

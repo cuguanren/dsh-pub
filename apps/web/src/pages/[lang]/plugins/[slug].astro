@@ -20,6 +20,7 @@ import { categoryLabel, typeLabel } from '../../../lib/categories.js';
 import { buildCapabilityTableRows } from '../../../lib/contribution-display.js';
 import { copy, locales, type Locale } from '../../../lib/i18n.js';
 import { loadReadmeHtml, readmeContentUrl } from '../../../lib/readme.js';
+import { relatedGuideHash, relatedPlugins } from '../../../lib/related-plugins.js';
 import { localizedTopic, topicForEntry } from '../../../lib/topics.js';
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 
@@ -63,6 +64,7 @@ const provenanceLabel =
         ? t.communityAutomated
         : t.builtInSource;
 const sourceRel = provenance === 'built-in' ? undefined : 'ugc';
+const noIndex = provenance === 'community-automated';
 const topic = topicForEntry(entry);
 const command = installCommand(entry);
 const distributionNote = localized(entry.distribution.note, locale);
@@ -73,7 +75,7 @@ const provenanceStatement =
     ? localized(entry.provenance.statement, locale)
     : t.builtInSourceHelp;
 const readmeSource = readmeContentUrl(entry, locale);
-const readme = await loadReadmeHtml(entry, locale);
+const readme = noIndex ? '' : await loadReadmeHtml(entry, locale);
 const limitationRaw = localized(entry.docs?.limitations, locale);
 const limitation =
   limitationRaw &&
@@ -89,6 +91,9 @@ const capabilityRows = buildCapabilityTableRows({
 });
 const hasContributions = capabilityRows.length > 0;
 const metricSlug = entry.distribution.installable ? installMetricSlug(entry) : undefined;
+const related = relatedPlugins(entry, marketplaceEntries);
+const guideHash = relatedGuideHash(entry);
+const topicLabel = localizedTopic(topic.label, locale);
 const canonical = `https://dsh.pub/${locale}/plugins/${entry.slug}/`;
 const inLanguage = locale === 'zh' ? 'zh-CN' : 'en';
 const pageTitle =
@@ -125,7 +130,13 @@ const structuredData = [
         name: t.plugins,
         item: `https://dsh.pub/${locale}/plugins/`,
       },
-      { '@type': 'ListItem', position: 3, name: displayName(entry), item: canonical },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: topicLabel,
+        item: `https://dsh.pub/${locale}/categories/${topic.id}/`,
+      },
+      { '@type': 'ListItem', position: 4, name: displayName(entry), item: canonical },
     ],
   },
 ];
@@ -136,6 +147,7 @@ const structuredData = [
   title={pageTitle}
   description={metaDescription}
   structuredData={structuredData}
+  noIndex={noIndex}
 >
   <section class="package-masthead">
     <div class="page-shell masthead-inner">
@@ -198,6 +210,7 @@ const structuredData = [
       {hasContributions && <a href="#capabilities">{t.capabilities}</a>}
       <a href="#installing">{entry.distribution.installable ? t.installing : t.availability}</a>
       <a href="#source">{t.sourceTab}</a>
+      {related.length > 0 && <a href="#related">{t.relatedHeading}</a>}
     </div>
   </nav>
 
@@ -276,12 +289,9 @@ const structuredData = [
             <div class="readme-content" set:html={readme} />
           ) : (
             <div class="readme-fallback">
+              <h3>{t.readmeSummaryTitle}</h3>
               <div set:html={descriptionHtml} />
-              <p>
-                {locale === 'zh'
-                  ? '完整双语 README 位于源仓库。本目录页优先展示可自动验证的运行时与分发事实。'
-                  : 'The complete bilingual README lives in the source repository. This registry page prioritizes runtime and distribution facts that can be verified automatically.'}
-              </p>
+              <p>{t.readmeSummaryBody}</p>
               <a
                 class="text-link"
                 href={
@@ -292,7 +302,7 @@ const structuredData = [
                 }
                 rel={sourceRel}
               >
-                {t.openGitHub}
+                {t.readmeSummaryLink}
                 <Icon name="external" size={15} />
               </a>
             </div>
@@ -379,6 +389,52 @@ const structuredData = [
       }
     </aside>
   </div>
+
+  {
+    related.length > 0 && (
+      <section class="related-plugins page-shell" id="related" data-related-plugins>
+        <p class="eyebrow">{t.relatedEyebrow}</p>
+        <h2>{t.relatedHeading}</h2>
+        <p class="related-method">{t.relatedMethod}</p>
+        <ul class="related-grid">
+          {related.map((item) => {
+            const itemTopic = topicForEntry(item);
+            return (
+              <li>
+                <a href={`/${locale}/plugins/${item.slug}/`} data-related-plugin={item.slug}>
+                  <strong>{displayName(item)}</strong>
+                  <span>{localized(item.description, locale)}</span>
+                  <em>
+                    {localizedTopic(itemTopic.label, locale)}
+                    {' · '}
+                    {item.distribution.installable
+                      ? t.installable
+                      : item.type === 'bundle'
+                        ? t.profileLayer
+                        : t.included}
+                  </em>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+        <nav class="related-guides" aria-label={t.relatedGuides}>
+          <a href={`/${locale}/categories/${topic.id}/`}>
+            {topicLabel}
+            <Icon name="arrow" size={15} />
+          </a>
+          <a href={`/${locale}/guide/#${guideHash}`}>
+            {entry.distribution.installable ? t.relatedInstallGuide : t.relatedIncludedGuide}
+            <Icon name="arrow" size={15} />
+          </a>
+          <a href={`/${locale}/guide/`}>
+            {t.relatedConcepts}
+            <Icon name="arrow" size={15} />
+          </a>
+        </nav>
+      </section>
+    )
+  }
 </BaseLayout>
 
 <script>
@@ -407,7 +463,14 @@ const structuredData = [
     background: var(--color-surface);
     border-bottom: 1px solid var(--color-rule);
     color: var(--color-text);
+    max-width: 100%;
+    overflow-x: clip;
     padding: 2.8rem 0 3.2rem;
+  }
+
+  .package-identity {
+    max-width: 100%;
+    min-width: 0;
   }
 
   .masthead-inner {
@@ -535,7 +598,113 @@ const structuredData = [
     display: grid;
     gap: 1.5rem;
     grid-template-columns: minmax(0, 1fr) 310px;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
     padding-top: 2.7rem;
+  }
+
+  .related-plugins {
+    padding-bottom: 4.5rem;
+    padding-top: 2.4rem;
+    scroll-margin-top: 1rem;
+  }
+
+  .related-plugins h2 {
+    font-size: clamp(1.55rem, 3vw, 2.1rem);
+    font-weight: 560;
+    letter-spacing: -0.04em;
+    margin: 0.35rem 0 0;
+  }
+
+  .related-method {
+    color: var(--color-text-muted);
+    font-size: 0.92rem;
+    line-height: 1.6;
+    margin: 0.75rem 0 1.4rem;
+    max-width: 46rem;
+  }
+
+  .related-grid {
+    display: grid;
+    gap: 0.9rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .related-grid a {
+    background: var(--color-surface);
+    border: 1px solid var(--color-rule);
+    border-radius: 10px;
+    color: var(--color-text);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-height: 132px;
+    padding: 0.95rem 1rem;
+    transition:
+      border-color var(--transition-fast),
+      transform var(--transition-fast);
+  }
+
+  .related-grid a:hover {
+    border-color: var(--color-accent);
+    text-decoration: none;
+    transform: translateY(-2px);
+  }
+
+  .related-grid strong {
+    font-size: 0.92rem;
+    font-weight: 620;
+    letter-spacing: -0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .related-grid span {
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    color: var(--color-text-muted);
+    display: -webkit-box;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    overflow: hidden;
+  }
+
+  .related-grid em {
+    color: var(--color-text-faint);
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    font-style: normal;
+    letter-spacing: 0.04em;
+    margin-top: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .related-guides {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.1rem 1.6rem;
+    margin-top: 1.5rem;
+  }
+
+  .related-guides a {
+    align-items: center;
+    color: var(--color-accent);
+    display: inline-flex;
+    font-size: 0.86rem;
+    gap: 0.35rem;
+  }
+
+  .package-content {
+    max-width: 100%;
+    min-width: 0;
   }
 
   .content-section {
@@ -787,10 +956,18 @@ const structuredData = [
     line-height: 1.75;
   }
 
+  .readme-fallback h3 {
+    color: var(--color-text);
+    font-size: 1.05rem;
+    margin: 0 0 0.75rem;
+  }
+
   .readme-content {
     color: var(--color-text-muted);
     font-size: 0.96rem;
     line-height: 1.72;
+    max-width: 100%;
+    min-width: 0;
     overflow-wrap: anywhere;
   }
 
@@ -820,8 +997,14 @@ const structuredData = [
     border-radius: var(--radius-medium);
     color: #e7f1fc;
     line-height: 1.55;
+    max-width: 100%;
     overflow-x: auto;
     padding: 1rem 1.1rem;
+  }
+
+  .readme-content :global(pre code) {
+    display: block;
+    max-width: 100%;
   }
 
   .readme-content :global(:not(pre) > code) {
@@ -834,17 +1017,29 @@ const structuredData = [
   }
 
   .readme-content :global(table) {
+    -webkit-overflow-scrolling: touch;
     border-collapse: collapse;
     display: block;
+    max-width: 100%;
     overflow-x: auto;
     width: 100%;
+  }
+
+  .readme-content :global(table thead),
+  .readme-content :global(table tbody),
+  .readme-content :global(table tr) {
+    display: table;
+    min-width: 100%;
+    width: max-content;
   }
 
   .readme-content :global(th),
   .readme-content :global(td) {
     border: 1px solid var(--color-rule);
+    min-width: 6.5rem;
     padding: 0.5rem 0.65rem;
     text-align: left;
+    vertical-align: top;
   }
 
   .readme-content :global(img) {
@@ -1036,24 +1231,82 @@ const structuredData = [
       grid-template-columns: 1fr;
     }
 
+    .masthead-aside {
+      width: 100%;
+    }
+
+    .masthead-source {
+      justify-self: stretch;
+      width: 100%;
+    }
+
     .package-sidebar {
       display: grid;
       gap: 0 2rem;
       grid-template-columns: repeat(2, 1fr);
+      max-width: 100%;
+      min-width: 0;
       position: static;
+    }
+
+    .related-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
   @media (max-width: 600px) {
     .package-masthead {
-      padding: 2.2rem 0 2rem;
+      padding: 1.75rem 0 1.6rem;
+    }
+
+    .package-layout {
+      padding-top: 1.5rem;
+    }
+
+    .content-section {
+      padding: 1.15rem 1rem 1.25rem;
+    }
+
+    .content-section h2 {
+      font-size: 1.45rem;
+    }
+
+    .readme-content {
+      font-size: 1rem;
+      line-height: 1.75;
+    }
+
+    .readme-content :global(pre) {
+      font-size: 0.84rem;
+      padding: 0.85rem 0.9rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .readme-content :global(pre code) {
+      white-space: pre-wrap;
+      word-break: break-word;
     }
 
     .tabs-inner {
-      gap: 1.5rem;
+      gap: 1.25rem;
+      min-height: 52px;
+    }
+
+    .tabs-inner a {
+      font-size: 0.84rem;
+    }
+
+    .package-title h1 {
+      font-size: clamp(1.55rem, 8vw, 2rem);
+    }
+
+    .package-meta {
+      font-size: 0.76rem;
     }
 
     .package-sidebar {
+      gap: 0.75rem;
       grid-template-columns: 1fr;
     }
 
@@ -1061,8 +1314,42 @@ const structuredData = [
       padding-top: 1.25rem;
     }
 
+    .related-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .capability-table {
+      display: block;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .capability-table thead,
+    .capability-table tbody,
+    .capability-table tr {
+      display: table;
+      min-width: 100%;
+      width: max-content;
+    }
+
     .capability-table tbody th {
-      width: 5.5rem;
+      min-width: 5.5rem;
+      width: auto;
+    }
+
+    .capability-table td {
+      min-width: 10rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .related-grid a {
+      transition: none;
+    }
+
+    .related-grid a:hover {
+      transform: none;
     }
   }
 </style>
