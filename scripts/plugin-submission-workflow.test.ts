@@ -65,8 +65,29 @@ describe('plugin submission workflow contract', () => {
     );
     expect(validateCheckout.with).toMatchObject({
       'persist-credentials': false,
-      ref: '${{ github.event.pull_request.base.sha }}',
+      ref: 'main',
     });
+    expect(workflow.jobs.validate['timeout-minutes']).toBe(120);
+    const webBuild = workflow.jobs.validate.steps.find(
+      (step: { name?: string }) => step.name === 'Build web app for integration tests',
+    );
+    const validateE2e = workflow.jobs.validate.steps.find(
+      (step: { name?: string }) => step.name === 'Run integration tests',
+    );
+    expect(webBuild.run).toBe('npm run build -w @dsh-pub/web');
+    expect(webBuild.env).toEqual({
+      PUBLIC_ADSENSE_CLIENT_ID: 'ca-pub-7584943302476161',
+      PUBLIC_ADSENSE_SLOT_CATALOG: '0987654321',
+      PUBLIC_ADSENSE_SLOT_DETAIL: '1234567890',
+      PUBLIC_GA_MEASUREMENT_ID: 'G-TEST123456',
+    });
+    expect(validateE2e.env.E2E_SKIP_BUILD).toBe('1');
+    expect(workflow.jobs.validate.steps.indexOf(staticChecks)).toBeLessThan(
+      workflow.jobs.validate.steps.indexOf(webBuild),
+    );
+    expect(workflow.jobs.validate.steps.indexOf(webBuild)).toBeLessThan(
+      workflow.jobs.validate.steps.indexOf(validateE2e),
+    );
     expect(artifacts.run).toBe('npm run build --workspace @dsh-pub/plugin-directory');
     expect(workflow.jobs.validate.steps.indexOf(process)).toBeLessThan(
       workflow.jobs.validate.steps.indexOf(artifacts),
@@ -163,6 +184,12 @@ describe('plugin submission workflow contract', () => {
     );
 
     expect(integrate.permissions).toEqual({ contents: 'read', 'pull-requests': 'read' });
+    expect(integrate['timeout-minutes']).toBe(120);
+    expect(build.env).toMatchObject({
+      PUBLIC_ADSENSE_CLIENT_ID: 'ca-pub-7584943302476161',
+      PUBLIC_GA_MEASUREMENT_ID: 'G-TEST123456',
+    });
+    expect(e2e.env.E2E_SKIP_BUILD).toBe('1');
     expect(checkout.with).toMatchObject({
       'persist-credentials': false,
       ref: "${{ github.event_name == 'workflow_dispatch' && 'main' || github.sha }}",
