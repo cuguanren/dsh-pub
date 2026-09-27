@@ -12,6 +12,7 @@ interface Props {
   structuredData?: Record<string, unknown> | Array<Record<string, unknown>>;
   showHeaderSearch?: boolean;
   noIndex?: boolean;
+  loadAdSense?: boolean;
 }
 
 const {
@@ -21,6 +22,7 @@ const {
   structuredData = [],
   showHeaderSearch = true,
   noIndex = false,
+  loadAdSense = false,
 } = Astro.props;
 const pageTitle = title
   ? `${title} · dsh.pub`
@@ -44,7 +46,7 @@ const analyticsConfig = analyticsEnabled
   ? `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config',${JSON.stringify(gaMeasurementId)});`
   : '';
 const adsenseClientId = normalizeAdSenseClientId(import.meta.env.PUBLIC_ADSENSE_CLIENT_ID);
-const adsenseEnabled = Boolean(adsenseClientId);
+const adsenseEnabled = Boolean(loadAdSense && adsenseClientId);
 ---
 
 <!doctype html>
