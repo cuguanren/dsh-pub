@@ -66,6 +66,8 @@ describe('DSH client assembly', () => {
         nav: 'dsh.pub Registry',
         title: 'Discover the DSH ecosystem',
         summary: 'Browse every public catalog entry.',
+        desktopNote: 'Browse inside the official desktop app.',
+        desktopLink: 'Official desktop app',
         searchPlaceholder: 'Search plugins',
       },
       { get: (target, key: string) => target[key as keyof typeof target] ?? key },
@@ -83,6 +85,8 @@ describe('DSH client assembly', () => {
     expect(html).toContain('Search plugins');
     expect(html).toContain('<option value="profile">profile</option>');
     expect(html).toContain('https://dsh.pub/en/plugins/');
+    expect(html).toContain('https://www.deepseek.com/harness/');
+    expect(html).toContain('Official desktop app');
     expect(html).not.toContain('<script');
   });
 });

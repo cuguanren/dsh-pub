@@ -70,6 +70,12 @@ export function DirectorySection({ t }: DirectorySectionProps) {
             {t('title')}
           </h2>
           <p className="dshpub-summary">{t('summary')}</p>
+          <p className="dshpub-desktop-note">
+            {t('desktopNote')}{' '}
+            <a href="https://www.deepseek.com/harness/" target="_blank" rel="noreferrer">
+              {t('desktopLink')}
+            </a>
+          </p>
         </div>
         <div className="dshpub-snapshot" aria-label={t('snapshot')}>
           <strong>{number.format(snapshot.entries.length)}</strong>
