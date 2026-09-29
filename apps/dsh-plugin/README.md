@@ -18,6 +18,19 @@ npx dshpub add dsh-pub/dsh-pub \
 
 Restart the DSH Web profile, open **Settings**, then choose **dsh.pub Registry**.
 
+## Official desktop app
+
+The official DeepSeek Harness desktop app for macOS and Windows uses that same Web profile.
+Download it from <https://www.deepseek.com/harness/>, then install this directory with the desktop
+app's plugin command:
+
+```bash
+dsh plugin --profile web add "github:dsh-pub/dsh-pub#main&path:/apps/dsh-plugin"
+```
+
+Restart the desktop app and open **Settings → dsh.pub Registry**. The package is distributed from
+this Git repository, so the desktop plugin manager installs it with that git spec.
+
 ## Update and verify
 
 ```bash

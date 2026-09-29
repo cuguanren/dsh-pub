@@ -53,6 +53,13 @@ const ui =
           '收录不代表兼容、安全或经过审计。安装前请查看源仓库、它请求的权限，以及它声明的运行时能力。',
         disclosureLink: '了解目录如何核对来源',
         agentIndex: '给 Agent 的 JSON 索引',
+        desktopEyebrow: '官方桌面端',
+        desktopTitle: 'DeepSeek Harness 桌面端现已开箱即用',
+        desktopBody:
+          '官方提供 macOS 与 Windows 安装包。装好后，把 dsh.pub 目录插件装进桌面端使用的 Web Profile，重启即可在设置里直接浏览全部插件。',
+        desktopDownload: '下载官方桌面端',
+        desktopInstallLabel: '装进桌面端',
+        desktopInstallNote: '重启桌面端后，打开设置里的「dsh.pub 插件目录」。',
         faqTitle: 'DeepSeek Harness 插件常见问题',
         faqBrowse: '浏览插件目录',
         faqSubmit: '提交插件',
@@ -79,6 +86,13 @@ const ui =
           'Listing does not imply compatibility, safety, or an audit. Inspect the source repository, the authority it requests, and the runtime capabilities it declares before installing.',
         disclosureLink: 'How the registry verifies source',
         agentIndex: 'JSON index for agents',
+        desktopEyebrow: 'OFFICIAL DESKTOP',
+        desktopTitle: 'The DeepSeek Harness desktop app is ready to install',
+        desktopBody:
+          'Official macOS and Windows installers are available. Add the dsh.pub directory to the Web profile the desktop app uses, then restart and browse every plugin from Settings.',
+        desktopDownload: 'Download the official desktop app',
+        desktopInstallLabel: 'Install it in the desktop app',
+        desktopInstallNote: 'After a restart, open Settings and choose dsh.pub Registry.',
         faqTitle: 'DeepSeek Harness plugin FAQ',
         faqBrowse: 'Browse the registry',
         faqSubmit: 'Submit a plugin',
@@ -106,6 +120,10 @@ const faqs = [
     action: ui.faqSubmit,
   },
 ];
+
+const officialDesktopUrl = 'https://www.deepseek.com/harness/';
+const desktopInstall =
+  'dsh plugin --profile web add "github:dsh-pub/dsh-pub#main&path:/apps/dsh-plugin"';
 
 const structuredData = [
   {
@@ -153,6 +171,25 @@ const structuredData = [
         <input type="search" name="q" aria-label={t.search} placeholder={t.search} />
         <button type="submit" aria-label={t.browse}><Icon name="arrow" size={19} /></button>
       </form>
+    </div>
+  </section>
+
+  <section class="desktop-band" aria-labelledby="desktop-app-title">
+    <div class="page-shell desktop-band-inner">
+      <div>
+        <span class="eyebrow">{ui.desktopEyebrow}</span>
+        <h2 id="desktop-app-title">{ui.desktopTitle}</h2>
+        <p>{ui.desktopBody}</p>
+        <a class="desktop-download" href={officialDesktopUrl} rel="noreferrer">
+          {ui.desktopDownload}
+          <Icon name="arrow" size={16} />
+        </a>
+      </div>
+      <div class="desktop-install">
+        <p>{ui.desktopInstallLabel}</p>
+        <code>{desktopInstall}</code>
+        <p>{ui.desktopInstallNote}</p>
+      </div>
     </div>
   </section>
 
@@ -483,6 +520,82 @@ const structuredData = [
     min-width: 54px;
   }
 
+  .desktop-band {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-rule);
+  }
+
+  .desktop-band-inner {
+    display: grid;
+    gap: 1.5rem 2.5rem;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr);
+    padding-bottom: 2.4rem;
+    padding-top: 2.4rem;
+  }
+
+  .desktop-band h2 {
+    font-size: clamp(1.45rem, 2vw, 1.9rem);
+    font-weight: 520;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    margin: 0.35rem 0 0;
+    max-width: 22ch;
+  }
+
+  .desktop-band p {
+    color: var(--color-text-muted);
+    margin: 0.7rem 0 0;
+    max-width: 40rem;
+  }
+
+  .desktop-download {
+    align-items: center;
+    background: var(--color-navy-900);
+    border-radius: 8px;
+    color: var(--color-text-on-dark);
+    display: inline-flex;
+    font-weight: 560;
+    gap: 0.45rem;
+    margin-top: 1.1rem;
+    min-height: 42px;
+    padding: 0.55rem 0.95rem;
+    text-decoration: none;
+  }
+
+  .desktop-download:hover {
+    background: var(--color-blue-600);
+  }
+
+  .desktop-install {
+    align-self: center;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-rule);
+    border-radius: 12px;
+    padding: 1rem 1.05rem 1.1rem;
+  }
+
+  .desktop-install p:first-child {
+    color: var(--color-text);
+    font-size: 0.78rem;
+    font-weight: 640;
+    letter-spacing: 0.06em;
+    margin: 0;
+  }
+
+  .desktop-install code {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.55;
+    margin-top: 0.7rem;
+    overflow-wrap: anywhere;
+  }
+
+  .desktop-install p:last-child {
+    font-size: 0.88rem;
+    margin-top: 0.75rem;
+  }
+
   .home-section {
     padding-bottom: 3.6rem;
     padding-top: 3.6rem;
@@ -716,6 +829,10 @@ const structuredData = [
   }
 
   @media (max-width: 860px) {
+    .desktop-band-inner {
+      grid-template-columns: 1fr;
+    }
+
     .highlight-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }

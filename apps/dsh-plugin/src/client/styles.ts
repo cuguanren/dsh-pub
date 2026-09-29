@@ -51,6 +51,18 @@ export const styles = String.raw`
   line-height: 1.65;
 }
 
+.dshpub-desktop-note {
+  max-width: 660px;
+  margin: 10px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.dshpub-desktop-note a {
+  color: var(--dsw-alias-brand-primary);
+}
+
 .dshpub-snapshot {
   min-width: 148px;
   padding-left: 18px;
