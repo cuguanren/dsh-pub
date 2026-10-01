@@ -293,6 +293,7 @@ const verifyTurnstile = async (
   secret: string | undefined,
   idempotencyKey: string,
   fetcher: FetchFunction,
+  action = 'plugin-submission',
 ) => {
   if (typeof tokenValue !== 'string' || tokenValue.length < 1 || tokenValue.length > 2_048) {
     throw new ApiError(400, 'turnstile_failed', 'Complete the verification and try again.');
@@ -331,7 +332,7 @@ const verifyTurnstile = async (
   if (
     !isRecord(result) ||
     result.success !== true ||
-    result.action !== 'plugin-submission' ||
+    result.action !== action ||
     typeof result.hostname !== 'string' ||
     !allowedHostnames.has(expectedHostname) ||
     result.hostname.toLocaleLowerCase() !== expectedHostname
@@ -619,6 +620,28 @@ export const handleRequest = async (
   }
 
   try {
+    if (request.method === 'GET' && url.pathname === '/api/analytics-config') {
+      if (!env.TURNSTILE_SITE_KEY || !env.TURNSTILE_SECRET_KEY) {
+        return json({ error: 'analytics_unavailable' }, 503, origin);
+      }
+      return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY }, 200, origin);
+    }
+    if (request.method === 'POST' && url.pathname === '/api/analytics-verify') {
+      if (origin !== url.origin) return json({ error: 'origin_not_allowed' }, 403);
+      const body = await readJson(request);
+      if (!isRecord(body) || !hasOnlyKeys(body, ['token'])) {
+        return json({ error: 'invalid_body' }, 400, origin);
+      }
+      await verifyTurnstile(
+        request,
+        body.token,
+        env.TURNSTILE_SECRET_KEY,
+        crypto.randomUUID(),
+        fetcher,
+        'analytics',
+      );
+      return json({ verified: true }, 200, origin);
+    }
     if (request.method === 'GET' && url.pathname === '/api/submission-config') {
       if (!env.TURNSTILE_SITE_KEY) {
         throw new ApiError(

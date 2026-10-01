@@ -681,3 +681,72 @@ describe('plugin submission intake', () => {
     await expect(response.json()).resolves.toMatchObject({ error: 'turnstile_failed' });
   });
 });
+
+describe('analytics verification', () => {
+  const request = (token: unknown = 'analytics-token', origin = 'https://dsh.pub') =>
+    post('/api/analytics-verify', { token }, origin);
+
+  it('serves public configuration without caching or exposing the secret', async () => {
+    const { env } = createEnv();
+    const response = await handleRequest(new Request('https://dsh.pub/api/analytics-config'), env);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await response.json()).toEqual({ turnstileSiteKey: 'turnstile-site-key' });
+    delete env.TURNSTILE_SECRET_KEY;
+    expect(
+      (await handleRequest(new Request('https://dsh.pub/api/analytics-config'), env)).status,
+    ).toBe(503);
+  });
+
+  it('requires a successful token for this hostname and the analytics action', async () => {
+    const { env } = createEnv();
+    const response = await handleRequest(request(), env, async (_input, init) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        response: 'analytics-token',
+        secret: 'turnstile-secret',
+      });
+      return Response.json({ success: true, hostname: 'dsh.pub', action: 'analytics' });
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await response.json()).toEqual({ verified: true });
+  });
+
+  it.each([
+    { success: false },
+    { success: false, 'error-codes': ['timeout-or-duplicate'] },
+    { success: true, hostname: 'other.example', action: 'analytics' },
+    { success: true, hostname: 'dsh.pub', action: 'plugin-submission' },
+    { success: true, hostname: 'dsh.pub' },
+  ])('rejects invalid verification results: %j', async (result) => {
+    const { env } = createEnv();
+    expect((await handleRequest(request(), env, async () => Response.json(result))).status).toBe(
+      400,
+    );
+  });
+
+  it('rejects missing origin, cross-origin, invalid tokens and oversized input before verification', async () => {
+    const { env } = createEnv();
+    const noFetch = async (): Promise<Response> => {
+      throw new Error('Must not call Siteverify');
+    };
+    for (const req of [
+      post('/api/analytics-verify', { token: 'x' }),
+      request('x', 'https://evil.example'),
+    ]) {
+      expect((await handleRequest(req, env, noFetch)).status).toBe(403);
+    }
+    for (const token of ['', null, 'x'.repeat(2049)]) {
+      expect((await handleRequest(request(token), env, noFetch)).status).toBe(400);
+    }
+    expect((await handleRequest(request('x'.repeat(5000)), env, noFetch)).status).toBe(413);
+  });
+
+  it('fails closed when verification is unavailable', async () => {
+    const { env } = createEnv();
+    const response = await handleRequest(request(), env, async () => {
+      throw new Error('network');
+    });
+    expect(response.status).toBe(503);
+    expect(await response.json()).not.toHaveProperty('verified', true);
+  });
+});

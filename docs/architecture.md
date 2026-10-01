@@ -240,3 +240,28 @@ submission ledger before new code can address it; secrets/config are then bound 
 the final deploy publishes the assets, API, Workflow class, and bindings together. Local development
 uses ignored `.dev.vars` values and `npx wrangler d1 migrations apply DB --local`. Workflows run in
 local Wrangler mode; `wrangler dev --remote` and remote Workflow bindings are not supported.
+
+## Verified analytics
+
+GA is initialized by `apps/web/src/lib/analytics.ts` only after a per-page Turnstile
+challenge with action `analytics` passes `/api/analytics-verify`. The server calls
+Siteverify and checks success, hostname and action. Configuration and verification
+responses are `no-store`; tokens are not cached or shared with plugin submission.
+The two widgets share a script loader, but retain independent actions and tokens.
+
+This uses the existing `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` and build-time
+`PUBLIC_GA_MEASUREMENT_ID`. No database, routing or CLI changes are needed. With no
+GA ID, no analytics challenge runs. Missing configuration, failed verification or
+timeouts leave GA off while content remains accessible. The widget appears only
+if Turnstile requires interaction. Every full page navigation verifies again.
+
+The initial URL/referrer are preserved and one config call sends the page view,
+with `traffic_verification=turnstile`. Do not also send a manual page view.
+This is a collection-quality measure, not a security boundary against clients
+sending fabricated events directly to Google. It can undercount short visits,
+blocked scripts and verification failures. Pre/post GA comparisons must mark the
+rollout date and account for this measurement change. Compare GA with Cloudflare
+request trends and Turnstile results; a lower GA count alone is not success.
+
+Rollback: revert the analytics-verification change and redeploy through the same
+Git integration. No schema migration or credential rotation is required.
