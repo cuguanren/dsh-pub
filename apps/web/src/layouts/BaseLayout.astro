@@ -42,9 +42,6 @@ const socialImageAlt =
 const structuredDataItems = Array.isArray(structuredData) ? structuredData : [structuredData];
 const gaMeasurementId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID?.trim();
 const analyticsEnabled = Boolean(gaMeasurementId && /^G-[A-Z0-9]+$/.test(gaMeasurementId));
-const analyticsConfig = analyticsEnabled
-  ? `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config',${JSON.stringify(gaMeasurementId)});`
-  : '';
 const adsenseClientId = normalizeAdSenseClientId(import.meta.env.PUBLIC_ADSENSE_CLIENT_ID);
 const adsenseEnabled = Boolean(loadAdSense && adsenseClientId);
 ---
@@ -97,18 +94,6 @@ const adsenseEnabled = Boolean(loadAdSense && adsenseClientId);
       ))
     }
     {
-      analyticsEnabled && (
-        <>
-          <script
-            is:inline
-            async
-            src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
-          />
-          <script is:inline set:html={analyticsConfig} />
-        </>
-      )
-    }
-    {
       adsenseEnabled && (
         <>
           <meta name="google-adsense-account" content={adsenseClientId} />
@@ -133,5 +118,11 @@ const adsenseEnabled = Boolean(loadAdSense && adsenseClientId);
     <Header locale={locale} path={Astro.url.pathname} showSearch={showHeaderSearch} />
     <main id="main-content"><slot /></main>
     <Footer locale={locale} />
+    {analyticsEnabled && <div data-analytics data-measurement-id={gaMeasurementId} />}
+    <script>
+      import { initializeAnalytics } from '../lib/analytics.js';
+      const analytics = document.querySelector<HTMLElement>('[data-analytics]');
+      if (analytics) void initializeAnalytics(analytics);
+    </script>
   </body>
 </html>

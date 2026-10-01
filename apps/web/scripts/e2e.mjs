@@ -218,7 +218,8 @@ async function assertSeoSurface() {
     !homepage.includes('"name":"如何安装 DSH 插件？"') ||
     !homepage.includes('id="faq-title"') ||
     !homepage.includes('DeepSeek Harness 插件常见问题</h2>') ||
-    !homepage.includes('googletagmanager.com/gtag/js?id=G-TEST123456') ||
+    !homepage.includes('data-measurement-id="G-TEST123456"') ||
+    homepage.includes('googletagmanager.com/gtag/js?id=G-TEST123456') ||
     !homepage.includes('name="google-adsense-account"') ||
     !homepage.includes('content="ca-pub-7584943302476161"') ||
     !homepage.includes(
@@ -466,6 +467,82 @@ try {
 
   const browser = await chromium.launch({ headless: true });
   try {
+    // Exercise the built page: GA must wait for both challenge and backend verification.
+    for (const verified of [true, false]) {
+      const analyticsPage = await browser.newPage();
+      let googleLoads = 0;
+      let releaseVerification;
+      let markVerificationRequested;
+      const verificationRequested = new Promise((resolve) => {
+        markVerificationRequested = resolve;
+      });
+      await analyticsPage.route('**/api/analytics-config', (route) =>
+        route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ turnstileSiteKey: 'test-site-key' }),
+        }),
+      );
+      await analyticsPage.route('**/api/analytics-verify', async (route) => {
+        if (route.request().postDataJSON().token !== 'analytics-e2e-token') {
+          throw new Error('Analytics used the wrong Turnstile token.');
+        }
+        markVerificationRequested();
+        await new Promise((resolve) => {
+          releaseVerification = resolve;
+        });
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ verified }),
+        });
+      });
+      await analyticsPage.route(
+        'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit',
+        (route) =>
+          route.fulfill({
+            contentType: 'application/javascript',
+            body: `globalThis.turnstile = { render(element, options) {
+          globalThis.__analyticsOptions = options;
+          return 'analytics-widget';
+        }, reset() {} };`,
+          }),
+      );
+      await analyticsPage.route('https://www.googletagmanager.com/**', (route) => {
+        googleLoads += 1;
+        return route.fulfill({ contentType: 'application/javascript', body: '' });
+      });
+      await analyticsPage.goto(`${origin}/en/?utm_source=verification-test`);
+      await analyticsPage.waitForFunction(() => globalThis.__analyticsOptions);
+      if (googleLoads !== 0) throw new Error('GA loaded before the challenge completed.');
+      await analyticsPage.evaluate(() => {
+        if (globalThis.__analyticsOptions.action !== 'analytics') throw new Error('Wrong action');
+        globalThis.__analyticsOptions.callback('analytics-e2e-token');
+      });
+      await verificationRequested;
+      if (googleLoads !== 0) throw new Error('GA did not wait for Siteverify.');
+      releaseVerification();
+      await analyticsPage.waitForFunction(
+        (state) =>
+          globalThis.document.querySelector('[data-analytics]')?.dataset.analyticsState === state,
+        verified ? 'verified' : 'unverified',
+      );
+      if (verified) {
+        await analyticsPage.waitForFunction(() =>
+          globalThis.document.querySelector('script[src*="googletagmanager.com/gtag"]'),
+        );
+        const events = await analyticsPage.evaluate(() =>
+          globalThis.dataLayer.map((args) => Array.from(args)),
+        );
+        if (
+          events.filter((event) => event[0] === 'config').length !== 1 ||
+          !events[1][2].page_location.endsWith('/en/?utm_source=verification-test')
+        ) {
+          throw new Error('Verified GA lost landing attribution or initialized more than once.');
+        }
+      } else if (googleLoads !== 0) throw new Error('Rejected verification loaded GA.');
+      if (!(await analyticsPage.locator('main').isVisible()))
+        throw new Error('Verification hid page content.');
+      await analyticsPage.close();
+    }
     const page = await browser.newPage();
     await page.goto(`${origin}/zh/`);
     const signalCanvas = page.locator('[data-backdrop-signals]');

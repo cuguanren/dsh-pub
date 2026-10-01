@@ -253,6 +253,7 @@ const clientCopy = {
 </BaseLayout>
 
 <script>
+  import { loadTurnstile, turnstileGlobal } from '../../lib/turnstile.js';
   import {
     buildSubmissionArtifacts,
     createPluginSubmission,
@@ -277,22 +278,6 @@ const clientCopy = {
   let submissionIdempotencyKey: string | undefined;
   let turnstileToken = '';
   let turnstileWidgetId: string | undefined;
-
-  interface TurnstileApi {
-    render(
-      container: HTMLElement,
-      options: {
-        action: string;
-        callback(token: string): void;
-        'error-callback'(): void;
-        'expired-callback'(): void;
-        sitekey: string;
-      },
-    ): string;
-    reset(widgetId: string): void;
-  }
-
-  const turnstileGlobal = globalThis as typeof globalThis & { turnstile?: TurnstileApi };
 
   const wait = (milliseconds: number) =>
     new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds));
@@ -443,21 +428,7 @@ const clientCopy = {
     if (!turnstileContainer) return;
     try {
       const config = await getPluginSubmissionConfig();
-      if (!turnstileGlobal.turnstile) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement('script');
-          script.async = true;
-          script.defer = true;
-          script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-          script.addEventListener('load', () => resolve(), { once: true });
-          script.addEventListener('error', () => reject(new Error('Turnstile failed to load.')), {
-            once: true,
-          });
-          document.head.append(script);
-        });
-      }
-      const turnstile = turnstileGlobal.turnstile;
-      if (!turnstile) throw new Error('Turnstile failed to initialize.');
+      const turnstile = await loadTurnstile();
       turnstileWidgetId = turnstile.render(turnstileContainer, {
         action: 'plugin-submission',
         sitekey: config.turnstileSiteKey,
